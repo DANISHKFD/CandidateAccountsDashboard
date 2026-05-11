@@ -1,0 +1,59 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TN 2026 · Constituencies</title>
+<link rel="stylesheet" href="common.css">
+<script src="data.js"></script><script src="common.js"></script>
+</head><body>
+<div class="app" id="app"></div>
+<script>
+function init(){
+  document.getElementById('app').innerHTML=buildSidebar('constituencies')+`
+  <div class="main">
+    ${buildTopbar('Constituencies')}
+    <div class="content">
+      <div class="filter-bar">
+        <span class="filter-label">Filter:</span>
+        <input class="search-lg" id="const-search" placeholder="Search constituency name…" oninput="render()" style="width:280px;font-size:13px;padding:7px 12px">
+        <select id="sort-sel" onchange="render()">
+          <option value="deposits">Highest Deposits</option>
+          <option value="loans">Highest Loans</option>
+          <option value="net_desc">Best Net Position</option>
+          <option value="net_asc">Most Indebted</option>
+          <option value="name">Name A–Z</option>
+          <option value="candidates">Most Candidates</option>
+        </select>
+        <span id="count-label" style="font-size:11px;color:var(--t3)"></span>
+      </div>
+      <div class="const-grid" id="grid"></div>
+    </div>
+  </div>`;
+  render();
+}
+
+function render(){
+  const q=(document.getElementById('const-search').value||'').toLowerCase().trim();
+  const sort=document.getElementById('sort-sel').value;
+  let list=[...TN.constituencies];
+  if(q) list=list.filter(c=>c.name.toLowerCase().includes(q));
+  if(sort==='deposits') list.sort((a,b)=>b.deposits-a.deposits);
+  else if(sort==='loans') list.sort((a,b)=>b.loans-a.loans);
+  else if(sort==='net_desc') list.sort((a,b)=>b.net-a.net);
+  else if(sort==='net_asc') list.sort((a,b)=>a.net-b.net);
+  else if(sort==='name') list.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sort==='candidates') list.sort((a,b)=>b.candidates-a.candidates);
+  document.getElementById('count-label').textContent=`${list.length} of 234 constituencies`;
+  const netColor=n=>n>=0?'var(--green)':'var(--red)';
+  document.getElementById('grid').innerHTML=list.map(c=>`
+    <div class="const-card" onclick="window.location.href='constituency.html?name='+encodeURIComponent('${escJ(c.name)}')">
+      <div class="const-name">${escH(c.name)}</div>
+      <div class="const-dep">${fmtShort(c.deposits)}</div>
+      ${c.loans>0?`<div class="const-loan">Loans: ${fmtShort(c.loans)}</div>`:'<div style="height:16px"></div>'}
+      <div class="const-footer">
+        <span>${c.candidates} candidates</span>
+        <span style="color:${netColor(c.net)};font-family:\'DM Mono\',monospace;font-size:10px;font-weight:700">${c.net>=0?'+':''}${fmtShort(c.net)}</span>
+      </div>
+    </div>`).join('');
+}
+function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escJ(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+init();
+</script></body></html>

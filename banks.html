@@ -1,0 +1,113 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TN 2026 · Banks</title>
+<link rel="stylesheet" href="common.css">
+<script src="data.js"></script><script src="common.js"></script>
+</head><body>
+<div class="app" id="app"></div>
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-hd"><div><div class="modal-title" id="m-title"></div><div class="modal-sub" id="m-sub"></div></div><button class="modal-x" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="filter-bar" style="margin-bottom:11px">
+        <select id="m-sort" onchange="renderModalCands()"><option value="dep">Highest Deposits</option><option value="loan">Highest Loans</option><option value="name">Name A–Z</option></select>
+      </div>
+      <div id="m-cands"></div>
+    </div>
+  </div>
+</div>
+<script>
+let curBank=null;
+function init(){
+  document.getElementById('app').innerHTML=buildSidebar('banks')+`
+  <div class="main">
+    ${buildTopbar('Banks')}
+    <div class="content">
+      <div class="filter-bar">
+        <span class="filter-label">View:</span>
+        <div class="tabs" style="margin-bottom:0">
+          <div class="tab active" id="tab-dep" onclick="switchTab('dep',this)">By Deposits</div>
+          <div class="tab" id="tab-loan" onclick="switchTab('loan',this)">By Loans</div>
+          <div class="tab" id="tab-acc" onclick="switchTab('acc',this)">By Accounts</div>
+        </div>
+        <input class="search-lg" id="bank-search" placeholder="Search bank name…" oninput="renderBanks()" style="width:220px;padding:7px 12px;font-size:12.5px">
+      </div>
+      <div class="bank-grid" id="bank-grid"></div>
+    </div>
+  </div>`;
+  renderBanks();
+}
+
+let sortMode='dep';
+function switchTab(mode,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');sortMode=mode;renderBanks();
+}
+
+function renderBanks(){
+  const q=(document.getElementById('bank-search').value||'').toLowerCase();
+  let list=[...TN.banks];
+  if(q) list=list.filter(b=>b.name.toLowerCase().includes(q));
+  if(sortMode==='dep') list.sort((a,b)=>b.deposits-a.deposits);
+  else if(sortMode==='loan') list.sort((a,b)=>b.loans-a.loans);
+  else list.sort((a,b)=>b.accounts-a.accounts);
+  document.getElementById('bank-grid').innerHTML=list.map(b=>`
+    <div class="bank-card" onclick="openModal('${escJ(b.name)}')">
+      <div class="bank-name">${escH(b.name)}</div>
+      <div class="bank-stats">
+        <div class="bstat"><div class="bstat-l">Deposits</div><div class="bstat-v blue">${fmtShort(b.deposits)}</div></div>
+        <div class="bstat"><div class="bstat-l">Loans</div><div class="bstat-v red">${b.loans>0?fmtShort(b.loans):'—'}</div></div>
+      </div>
+      <div class="bank-foot"><span>${b.accounts.toLocaleString()} accounts</span><span class="bank-link">View candidates →</span></div>
+    </div>`).join('');
+}
+
+function openModal(name){
+  curBank=name;
+  const b=TN.banks.find(x=>x.name===name)||{name,deposits:0,loans:0,accounts:0};
+  document.getElementById('m-title').textContent=name;
+  document.getElementById('overlay').classList.add('open');
+  renderModalCands();
+}
+
+function renderModalCands(){
+  const sort=document.getElementById('m-sort').value;
+  let cands=[];
+  TN.candidates.forEach(c=>{
+    const accs=(TN.cand_accounts[c.key]||[]).filter(a=>a.bank===curBank);
+    const laccs=(TN.cand_loans[c.key]||[]).filter(a=>a.bank===curBank);
+    if(accs.length||laccs.length){
+      const depAmt=accs.reduce((s,a)=>s+a.amount,0);
+      const loanAmt=laccs.reduce((s,a)=>s+a.amount,0);
+      cands.push({...c,bankDep:depAmt,bankLoan:loanAmt,accs,laccs});
+    }
+  });
+  if(sort==='dep') cands.sort((a,b)=>b.bankDep-a.bankDep);
+  else if(sort==='loan') cands.sort((a,b)=>b.bankLoan-a.bankLoan);
+  else cands.sort((a,b)=>a.name.localeCompare(b.name));
+  const totalDep=cands.reduce((s,c)=>s+c.bankDep,0);
+  document.getElementById('m-sub').textContent=`${cands.length} candidates · Total deposits: ${fmt(totalDep)}`;
+  document.getElementById('m-cands').innerHTML=cands.length===0?
+    '<p style="color:var(--t3);text-align:center;padding:24px">No candidate data found for this bank.</p>':
+    cands.map(c=>`
+      <a class="cand-row" href="candidate.html?key=${encodeURIComponent(c.key)}">
+        <div class="cand-avatar" style="background:${avatarColor(c.key)}">${initials(c.key)}</div>
+        <div class="cand-info">
+          <div class="cand-name">${escH(c.key)}</div>
+          <div class="cand-meta"><span class="ppill" style="background:${partyColor(c.party)}22;color:${partyColor(c.party)}">${escH(c.party)}</span> · ${escH(c.constituency)}</div>
+          <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
+          ${c.accs.map(a=>`<span style="font-size:10px;background:var(--bg2);border-radius:4px;padding:2px 7px;color:var(--t2)">${escH(a.branch||'Main')} · ${escH(a.relation)} · ${fmt(a.amount)}</span>`).join('')}
+          ${c.laccs.map(a=>`<span style="font-size:10px;background:var(--rl);border-radius:4px;padding:2px 7px;color:var(--red)">LOAN: ${escH(a.branch||'Main')} · ${fmt(a.amount)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="cand-amt">
+          <div class="cand-dep">${c.bankDep>0?fmtShort(c.bankDep):'—'}</div>
+          ${c.bankLoan>0?`<div class="cand-loan">Loan: ${fmtShort(c.bankLoan)}</div>`:''}
+        </div>
+      </a>`).join('');
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');curBank=null;}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escJ(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+init();
+</script></body></html>
