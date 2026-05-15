@@ -1,0 +1,102 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TN 2026 · Candidates</title>
+<link rel="stylesheet" href="common.css">
+<script src="data.js"></script><script src="common.js"></script>
+</head><body>
+<div class="app" id="app"></div>
+<script>
+const PAGE_SIZE=50;let curPage=0;let filtered=[];
+
+function init(){
+  const params=new URLSearchParams(location.search);
+  document.getElementById('app').innerHTML=buildSidebar('candidates')+`
+  <div class="main">
+    ${buildTopbar('Candidates')}
+    <div class="content">
+      <div class="filter-bar">
+        <input class="search-lg" id="q" placeholder="Search candidate name, party or constituency…" oninput="applyFilter()" style="width:320px;font-size:13px;padding:7px 12px">
+        <select id="party-f" onchange="applyFilter()"><option value="">All Parties</option></select>
+        <select id="const-f" onchange="applyFilter()"><option value="">All Constituencies</option></select>
+        <select id="sort-f" onchange="applyFilter()">
+          <option value="dep">Highest Deposits</option><option value="loan">Highest Loans</option>
+          <option value="net_d">Best Net</option><option value="net_a">Worst Net</option><option value="name">Name A–Z</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">All Candidates</div><div class="card-sub" id="count-lbl"></div></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:36px">#</th>
+              <th>Candidate</th><th>Party</th><th>Constituency</th>
+              <th style="text-align:right">Deposits</th><th style="text-align:right">Loans</th><th style="text-align:right">Net</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="pager"><span id="pager-info"></span><div class="pager-btns" id="pager-btns"></div></div>
+      </div>
+    </div>
+  </div>`;
+
+  // Populate filters
+  const parties=[...new Set(TN.candidates.map(c=>c.party))].sort();
+  const consts=[...new Set(TN.candidates.map(c=>c.constituency))].sort();
+  document.getElementById('party-f').innerHTML+= parties.map(p=>`<option value="${escH(p)}">${escH(p)}</option>`).join('');
+  document.getElementById('const-f').innerHTML+= consts.map(c=>`<option value="${escH(c)}">${escH(c)}</option>`).join('');
+
+  // Handle URL query param
+  const qp=params.get('q');
+  if(qp){document.getElementById('q').value=qp;}
+  const cp=params.get('constituency');
+  if(cp){document.getElementById('const-f').value=cp;}
+
+  applyFilter();
+}
+
+function applyFilter(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const pf=document.getElementById('party-f').value;
+  const cf=document.getElementById('const-f').value;
+  const sf=document.getElementById('sort-f').value;
+  filtered=TN.candidates.filter(c=>
+    (!q||(c.name.toLowerCase().includes(q)||c.party.toLowerCase().includes(q)||c.constituency.toLowerCase().includes(q)))&&
+    (!pf||c.party===pf)&&(!cf||c.constituency===cf)
+  );
+  if(sf==='dep') filtered.sort((a,b)=>b.deposits-a.deposits);
+  else if(sf==='loan') filtered.sort((a,b)=>b.loans-a.loans);
+  else if(sf==='net_d') filtered.sort((a,b)=>b.net-a.net);
+  else if(sf==='net_a') filtered.sort((a,b)=>a.net-b.net);
+  else filtered.sort((a,b)=>a.name.localeCompare(b.name));
+  curPage=0;renderTable();
+}
+
+function renderTable(){
+  const start=curPage*PAGE_SIZE,end=start+PAGE_SIZE;
+  const page=filtered.slice(start,end);
+  document.getElementById('count-lbl').textContent=`Showing ${start+1}–${Math.min(end,filtered.length)} of ${filtered.length.toLocaleString()} candidates`;
+  document.getElementById('tbody').innerHTML=page.map((c,i)=>`
+    <tr onclick="window.location.href='candidate.html?key='+encodeURIComponent('${escJ(c.key)}')">
+      <td class="rank-cell">${start+i+1}</td>
+      <td class="name-cell">${escH(c.key)}</td>
+      <td><span class="ppill" style="background:${partyColor(c.party)}22;color:${partyColor(c.party)}">${escH(c.party)}</span></td>
+      <td style="color:var(--t2)">${escH(c.constituency)}</td>
+      <td class="num">${fmt(c.deposits)}</td>
+      <td class="num ${c.loans>0?'neg':''}">${c.loans>0?fmt(c.loans):'—'}</td>
+      <td class="num ${c.net>=0?'pos':'neg'}">${c.net>=0?'+':''}${fmt(c.net)}</td>
+    </tr>`).join('');
+  // Pager
+  const total=Math.ceil(filtered.length/PAGE_SIZE);
+  document.getElementById('pager-info').textContent=`Page ${curPage+1} of ${total}`;
+  let btns=`<button class="pg" onclick="goPage(${curPage-1})" ${curPage===0?'disabled':''}>‹ Prev</button>`;
+  for(let p=Math.max(0,curPage-2);p<=Math.min(total-1,curPage+2);p++){
+    btns+=`<button class="pg ${p===curPage?'cur':''}" onclick="goPage(${p})">${p+1}</button>`;
+  }
+  btns+=`<button class="pg" onclick="goPage(${curPage+1})" ${curPage>=total-1?'disabled':''}>Next ›</button>`;
+  document.getElementById('pager-btns').innerHTML=btns;
+}
+function goPage(p){curPage=p;renderTable();document.querySelector('.content').scrollTo(0,0);}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escJ(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+init();
+</script></body></html>

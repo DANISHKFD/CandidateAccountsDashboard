@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TN 2026 · Parties</title>
+<link rel="stylesheet" href="common.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="data.js"></script><script src="common.js"></script>
+</head><body>
+<div class="app" id="app"></div>
+<script>
+function init(){
+  document.getElementById('app').innerHTML=buildSidebar('parties')+`
+  <div class="main">
+    ${buildTopbar('Parties')}
+    <div class="content">
+      <div class="card mb" style="margin-bottom:14px">
+        <div class="card-hd"><div class="card-title">Party Wealth Distribution (Top 15)</div><div class="card-sub">Total declared deposits and loans</div></div>
+        <canvas id="chart-party" height="100"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">All Parties</div><div class="card-sub">${TN.parties.length} parties with candidates</div></div>
+          <input class="search-lg" id="party-search" placeholder="Search party…" oninput="renderTable()" style="width:200px;padding:6px 10px;font-size:12px">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:36px">#</th><th>Party</th><th style="text-align:right">Candidates</th>
+              <th style="text-align:right">Total Deposits</th><th style="text-align:right">Total Loans</th><th style="text-align:right">Net</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  renderChart();renderTable();
+}
+
+function renderChart(){
+  const top=TN.parties.slice(0,15);
+  new Chart(document.getElementById('chart-party'),{type:'bar',data:{
+    labels:top.map(p=>p.name.length>20?p.name.slice(0,18)+'…':p.name),
+    datasets:[{label:'Deposits',data:top.map(p=>p.deposits),backgroundColor:top.map(p=>partyColor(p.name)+'BB'),borderRadius:4},{label:'Loans',data:top.map(p=>p.loans),backgroundColor:top.map(p=>partyColor(p.name)+'44'),borderRadius:4}]
+  },options:{responsive:true,scales:{y:{ticks:{callback:v=>fmtShort(v),font:{family:'DM Mono',size:9}},grid:{color:'#E2DDD5'}},x:{grid:{display:false},ticks:{font:{size:10}}}},plugins:{legend:{position:'top',labels:{font:{family:'DM Sans',size:10},boxWidth:9}}}}});
+}
+
+function renderTable(){
+  const q=(document.getElementById('party-search').value||'').toLowerCase();
+  const list=TN.parties.filter(p=>!q||p.name.toLowerCase().includes(q));
+  document.getElementById('tbody').innerHTML=list.map((p,i)=>{
+    const net=p.deposits-p.loans;
+    const pc=partyColor(p.name);
+    return `<tr onclick="window.location.href='candidates.html?party='+encodeURIComponent('${escJ(p.name)}')">
+      <td class="rank-cell">${i+1}</td>
+      <td class="name-cell"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${pc};margin-right:7px;vertical-align:middle"></span>${escH(p.name)}</td>
+      <td class="num">${p.candidates}</td>
+      <td class="num">${fmt(p.deposits)}</td>
+      <td class="num neg">${p.loans>0?fmt(p.loans):'—'}</td>
+      <td class="num ${net>=0?'pos':'neg'}">${net>=0?'+':''}${fmt(net)}</td>
+    </tr>`;
+  }).join('');
+}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escJ(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+init();
+</script></body></html>
