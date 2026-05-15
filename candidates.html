@@ -60,7 +60,7 @@ function applyFilter(){
   const cf=document.getElementById('const-f').value;
   const sf=document.getElementById('sort-f').value;
   filtered=TN.candidates.filter(c=>
-    (!q||(c.name.toLowerCase().includes(q)||c.party.toLowerCase().includes(q)||c.constituency.toLowerCase().includes(q)))&&
+    (!q||(c.key.toLowerCase().includes(q)||c.party.toLowerCase().includes(q)||c.constituency.toLowerCase().includes(q)))&&
     (!pf||c.party===pf)&&(!cf||c.constituency===cf)
   );
   if(sf==='dep') filtered.sort((a,b)=>b.deposits-a.deposits);
